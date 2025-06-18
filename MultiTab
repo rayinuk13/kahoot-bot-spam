@@ -1,0 +1,56 @@
+const puppeteer = require('puppeteer');
+const readline = require('readline');
+
+// Setup terminal input
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+// Ask for PIN and names
+rl.question('Enter Kahoot Game PIN: ', (kahootPin) => {
+  rl.question('Enter names (separated by commas): ', async (namesInput) => {
+    const playerNames = namesInput.split(',').map(name => name.trim());
+
+    const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'; // For macOS
+    // If you're on Windows, change this to:
+    // const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+
+    const browser = await puppeteer.launch({
+      headless: false,
+      executablePath: chromePath,
+      args: ['--disable-infobars']
+    });
+
+    // For each player, open a new tab and join Kahoot
+    for (const name of playerNames) {
+      const page = await browser.newPage();
+      await page.goto('https://kahoot.it', { waitUntil: 'networkidle2' });
+
+      try {
+        // Type PIN
+        await page.waitForSelector('#game-input', { timeout: 10000 });
+        await page.type('#game-input', kahootPin, { delay: 50 });
+        await page.keyboard.press('Enter');
+
+        // Type nickname
+        await page.waitForSelector('#nickname', { timeout: 10000 });
+        await page.type('#nickname', name, { delay: 100 });
+
+        // Click join
+        await page.click('[data-functional-selector="join-button-username"]');
+
+        console.log(`✔ Joined as ${name}`);
+      } catch (err) {
+        console.error(`❌ Failed for ${name}: ${err.message}`);
+        await page.close();
+      }
+    }
+
+    console.log('✅ All names processed. Tabs will stay open.');
+    rl.close();
+
+    // Keep browser open so names stay in game
+    await new Promise(() => {});
+  });
+});
