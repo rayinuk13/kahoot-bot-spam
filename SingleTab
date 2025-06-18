@@ -1,0 +1,49 @@
+const puppeteer = require('puppeteer');
+const readline = require('readline');
+
+// Get input from terminal
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+// Ask for game pin and names
+rl.question('Enter Kahoot Game PIN: ', (kahootPin) => {
+  rl.question('Enter names (separated by commas): ', async (namesInput) => {
+    const playerNames = namesInput.split(',').map(name => name.trim());
+
+    const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'; // macOS
+    // If on Windows: const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+
+    const browser = await puppeteer.launch({
+      headless: false,
+      executablePath: chromePath,
+      args: ['--disable-infobars']
+    });
+
+    for (const name of playerNames) {
+      const page = await browser.newPage();
+      await page.goto('https://kahoot.it', { waitUntil: 'networkidle2' });
+
+      try {
+        await page.waitForSelector('#game-input', { timeout: 10000 });
+        await page.type('#game-input', kahootPin, { delay: 50 });
+        await page.keyboard.press('Enter');
+
+        await page.waitForSelector('#nickname', { timeout: 10000 });
+        await page.type('#nickname', name, { delay: 100 });
+
+        await page.click('[data-functional-selector="join-button-username"]');
+
+        console.log(`✔ Joined as ${name}`);
+      } catch (error) {
+        console.error(`❌ Failed to join as ${name}: ${error.message}`);
+        await page.close();
+      }
+    }
+
+    console.log('✅ All players attempted to join. Keeping browser open.');
+    rl.close();
+    await new Promise(() => {}); // Keeps Chrome open
+  });
+});
